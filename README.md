@@ -1,41 +1,58 @@
 # I2V Cloud Engine
 
-Backend de Image-to-Video para executar modelos I2V em nuvem e ser consumido pelo LibertyAI.
+Backend e interface leves de Image-to-Video para rodar em nuvem e ser consumidos pelo LibertyAI.
 
-## Objetivo
+## Importação direta na Replit
 
-O repositório é independente do `LibertyAI`. Ele será importado/deployado na Replit e expõe uma API HTTP para geração de vídeo.
+Este repositório foi preparado para ser importado como projeto Python **sem precisar do Replit Agent para montar a aplicação**.
 
-Modelo principal configurado: `Wan-AI/Wan2.2-I2V-A14B-Diffusers`.
+O arquivo `.replit` já aponta para o launcher. As dependências ficam em `requirements.txt`.
+
+Depois da importação, configure somente as variáveis de ambiente/Secrets:
+
+- `HF_TOKEN`: seu token da Hugging Face.
+- `I2V_API_KEY`: chave privada que o LibertyAI usará para chamar esta Engine. Pode ser qualquer segredo forte criado por você.
+- `I2V_MODEL`: opcional. Padrão `Wan-AI/Wan2.2-I2V-A14B-Diffusers`.
+- `I2V_BACKEND`: opcional. Padrão `huggingface`. Outros valores: `auto` ou `diffusers`.
+- `MAX_FILE_MB`: opcional. Padrão 20 MB.
+
+## O que já vem pronto
+
+- interface web leve para testar Image-to-Video;
+- upload de PNG/JPEG/WebP;
+- prompt e negative prompt;
+- seleção de modelo;
+- frames, steps e guidance;
+- geração e reprodução do MP4;
+- download do resultado;
+- endpoint de saúde com diagnóstico de CUDA/GPU;
+- API HTTP para o LibertyAI;
+- autenticação opcional por `x-i2v-api-key`;
+- CORS para integração com cliente local.
+
+## Endpoints
+
+- `/` interface da Engine
+- `/api` informações do serviço
+- `/health` diagnóstico do runtime
+- `/api/models` catálogo de modelos
+- `/api/generate` geração multipart com imagem e parâmetros
+- `/docs` documentação automática do FastAPI
 
 ## Arquitetura
 
-`LibertyAI (PC) -> HTTPS API -> I2V Cloud Engine (Replit) -> backend de inferência -> MP4`
+`LibertyAI no PC -> HTTPS -> I2V Cloud Engine -> backend de inferência -> MP4`
 
-O cliente local nunca precisa carregar o modelo pesado.
+O cliente local não precisa carregar o modelo pesado.
 
-## Configuração
+## Modelo
 
-Variáveis de ambiente:
+O modelo principal configurado é o Wan 2.2 I2V A14B do Hugging Face. Os pesos não são versionados neste GitHub porque são grandes demais para um repositório Git comum. Quando o backend usa Hugging Face, o modelo é executado pelo provedor de inferência configurado pelo `HF_TOKEN`.
 
-- `HF_TOKEN`: token Hugging Face, somente como Secret da Replit.
-- `I2V_MODEL`: modelo a usar. Padrão Wan 2.2 I2V A14B.
-- `I2V_BACKEND`: `auto`, `diffusers` ou `huggingface`.
-- `MAX_FILE_MB`: limite de upload, padrão 20.
+O modo `diffusers` fica disponível para um runtime com GPU/CUDA compatível e armazenamento suficiente, sem exigir alterações no projeto.
 
-Em `auto`, o serviço tenta inferência local via Diffusers quando CUDA está disponível; sem CUDA, usa o endpoint da Hugging Face como fallback.
+## Segurança
 
-## API
+Nunca coloque tokens no código. No deployment da Replit, use Secrets/Environment Variables.
 
-- `GET /` informações básicas
-- `GET /health` diagnóstico
-- `GET /api/models` modelos configurados/disponíveis
-- `POST /api/generate` multipart com `image`, `prompt`, `negative_prompt`, `num_frames`, `num_inference_steps`, `guidance_scale`
-
-A resposta de `/api/generate` é um MP4 diretamente.
-
-## Replit
-
-Importe este repositório como um projeto Python. O processo web deve escutar em `0.0.0.0` e usar a porta fornecida por `PORT`.
-
-Nunca coloque `HF_TOKEN` no código ou em arquivos versionados.
+A `I2V_API_KEY` é a credencial usada futuramente pelo `LibertyAI` para acessar a Engine. O token `HF_TOKEN` permanece somente no servidor.
