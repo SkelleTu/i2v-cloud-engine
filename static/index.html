@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>I2V Cloud Engine</title>
+  <style>
+    :root{font-family:Inter,system-ui,sans-serif;color:#e9eef7;background:#0b1020}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#162342,#0b1020 55%)}main{width:min(1100px,94vw);margin:0 auto;padding:34px 0 50px}h1{margin:0 0 6px;font-size:30px}p{color:#9eabc1}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card{background:#11182a;border:1px solid #27324b;border-radius:16px;padding:20px;box-shadow:0 16px 50px #0004}label{display:block;margin:14px 0 7px;color:#cdd7e8;font-size:14px}input,select,textarea,button{width:100%;font:inherit;border-radius:10px;border:1px solid #34415e;background:#0d1424;color:#eef3fa;padding:11px}textarea{min-height:130px;resize:vertical}button{margin-top:16px;cursor:pointer;background:#355ef5;border-color:#355ef5;font-weight:700}button:disabled{opacity:.55;cursor:wait}img{width:100%;max-height:340px;object-fit:contain;border-radius:12px;background:#090d17;margin-top:12px}video{width:100%;border-radius:12px;background:#000;margin-top:12px}.status{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}.pill{padding:6px 10px;border-radius:999px;background:#1d2941;color:#bcd0ee;font-size:12px}.small{font-size:12px;color:#8390a6}.row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.actions{display:flex;gap:10px}.actions button{flex:1}.hidden{display:none}@media(max-width:800px){.grid{grid-template-columns:1fr}.row{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1>I2V Cloud Engine</h1>
+    <p>Image-to-Video com backend remoto. O LibertyAI poderá consumir esta mesma API depois.</p>
+    <div class="status"><span class="pill" id="health">Verificando serviço...</span><span class="pill" id="modelPill">Wan 2.2 I2V A14B</span></div>
+  </div>
+  <div class="grid" style="margin-top:18px">
+    <section class="card">
+      <h2>Imagem inicial</h2>
+      <input id="image" type="file" accept="image/png,image/jpeg,image/webp">
+      <img id="preview" class="hidden" alt="Prévia da imagem">
+      <label>Prompt</label>
+      <textarea id="prompt" placeholder="Descreva o movimento da cena..."></textarea>
+      <label>Negative prompt</label>
+      <textarea id="negative" placeholder="Opcional"></textarea>
+    </section>
+    <section class="card">
+      <h2>Configuração</h2>
+      <label>Modelo</label>
+      <select id="model"></select>
+      <div class="row">
+        <div><label>Frames</label><input id="frames" type="number" value="49" min="1" max="200"></div>
+        <div><label>Steps</label><input id="steps" type="number" value="30" min="1" max="100"></div>
+        <div><label>Guidance</label><input id="guidance" type="number" value="5" min="0" max="20" step="0.5"></div>
+      </div>
+      <label>Chave da API da Engine <span class="small">(opcional se I2V_API_KEY não estiver configurada no servidor)</span></label>
+      <input id="engineKey" type="password" placeholder="x-i2v-api-key">
+      <button id="generate">Gerar vídeo</button>
+      <div id="message" class="small" style="margin-top:12px"></div>
+    </section>
+  </div>
+  <section class="card" style="margin-top:18px">
+    <h2>Resultado</h2>
+    <div id="result" class="small">Nenhum vídeo gerado.</div>
+  </section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let file=null;
+$('image').addEventListener('change',e=>{file=e.target.files[0]||null;if(file){$('preview').src=URL.createObjectURL(file);$('preview').classList.remove('hidden')}});
+async function load(){try{const h=await fetch('/health').then(r=>r.json());$('health').textContent=h.cuda?`Online • GPU: ${h.gpu}`:(h.hf_token_configured?'Online • HF configurado':'Online • falta HF_TOKEN');const m=await fetch('/api/models').then(r=>r.json());$('model').innerHTML=m.models.map(x=>`<option value="${x.id}">${x.name}${x.recommended?' • recomendado':''}</option>`).join('');$('model').value=m.default;$('modelPill').textContent=m.models.find(x=>x.id===m.default)?.name||m.default}catch(e){$('health').textContent='Falha ao consultar serviço'}}
+$('generate').onclick=async()=>{if(!file)return $('message').textContent='Selecione uma imagem.';if(!$('prompt').value.trim())return $('message').textContent='Digite um prompt.';$('generate').disabled=true;$('message').textContent='Gerando...';$('result').textContent='Processando vídeo...';const fd=new FormData();fd.append('image',file);fd.append('prompt',$('prompt').value);fd.append('negative_prompt',$('negative').value);fd.append('model',$('model').value);fd.append('num_frames',$('frames').value);fd.append('num_inference_steps',$('steps').value);fd.append('guidance_scale',$('guidance').value);const headers={};if($('engineKey').value)headers['x-i2v-api-key']=$('engineKey').value;try{const r=await fetch('/api/generate',{method:'POST',headers,body:fd});if(!r.ok)throw new Error(await r.text());const blob=await r.blob();const url=URL.createObjectURL(blob);$('result').innerHTML=`<video controls autoplay loop src="${url}"></video><div class="actions"><a style="flex:1;text-decoration:none" download="i2v-video.mp4" href="${url}"><button type="button">Salvar MP4</button></a></div>`;$('message').textContent='Vídeo gerado.'}catch(e){$('result').textContent='Erro na geração.';$('message').textContent=e.message||String(e)}finally{$('generate').disabled=false}};
+load();
+</script>
+</body>
+</html>
